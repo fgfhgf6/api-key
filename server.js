@@ -8,37 +8,30 @@ const PORT = process.env.PORT || 3000;
 // ==========================================
 // PENGATURAN KODE RAHASIA & KUNCI UTAMA
 // ==========================================
-const ADMIN_SECRET_CODE = 'adminmaskay55'; // Kode rahasia login admin Anda
-const MASTER_API_KEY = 'maskay';       // API Key bawaan/utama
+const ADMIN_SECRET_CODE = 'adminmaskay55'; // Kode rahasia login admin Anda di web
+const MASTER_API_KEY = 'maskay';       // API Key bawaan/utama untuk user biasa
 
 // Menyimpan daftar API Key yang valid di dalam memori RAM server
 let VALID_API_KEYS = [MASTER_API_KEY];
 
-// Konfigurasi CORS agar bisa diakses website Vercel
-const ALLOWED_ORIGINS = ['http://localhost:5500', 'http://127.0.0.1:5500'];
-app.use(cors({
-    origin: function (origin, callback) {
-        if (!origin) return callback(null, true);
-        const isVercel = origin.endsWith('.vercel.app');
-        if (ALLOWED_ORIGINS.indexOf(origin) !== -1 || isVercel) {
-            return callback(null, true);
-        } else {
-            return callback(new Error('Akses CORS ditolak oleh server.'), false);
-        }
-    }
-}));
+// ==========================================
+// FIX KONEKSI: MENGIZINKAN SEMUA WEBSITE (NETLIFY/LOCAL)
+// ==========================================
+app.use(cors({ origin: '*' }));
+
+app.use(express.json());
 
 const FIRST_NAMES = ['Budi', 'Andi', 'Joko', 'Siti', 'Dewi', 'Rini', 'Rian', 'Eko', 'Agus'];
 const LAST_NAMES = ['Santoso', 'Wijaya', 'Prasetyo', 'Lestari', 'Kurniawan', 'Hidayat'];
 
 /**
- * [ENDPOINT 1] GET: Pembuat NIK (Metode GET ala api.qsr.web.id)
+ * [ENDPOINT 1] GET: Pembuat NIK
  */
 app.get('/api/generate-nik', (req, res) => {
     try {
         const { prov, kota, kec, dob, gender, nama, apikey } = req.query;
 
-        // Validasi apakah API Key yang dimasukkan ada di dalam daftar array kita
+        // Validasi apakah API Key yang dimasukkan ada di dalam daftar array
         if (!apikey || !VALID_API_KEYS.includes(apikey)) {
             return res.status(401).json({ 
                 status: 'error', 
@@ -46,6 +39,7 @@ app.get('/api/generate-nik', (req, res) => {
             });
         }
 
+        // Validasi kelengkapan data parameter
         if (!prov || !kota || !kec || !dob || !gender) {
             return res.status(400).json({ 
                 status: 'error', 
@@ -53,18 +47,24 @@ app.get('/api/generate-nik', (req, res) => {
             });
         }
 
+        // Logika rumus pembuatan angka NIK KTP Indonesia
         const [dayPart, monthPart, yearPart] = dob.split('-');
         let day = parseInt(dayPart, 10);
         const month = monthPart.padStart(2, '0');
         const year = yearPart.substring(2);
 
+        // Aturan khusus wanita: tanggal lahir ditambah 40
         if (gender.toLowerCase() === 'wanita') day += 40;
         const dayStr = String(day).padStart(2, '0');
 
+        // Nomor urut otomatis acak 4 digit (0001 - 0999)
         const randomNum = crypto.randomInt(1, 1000);
         const nomorUrut = String(randomNum).padStart(4, '0');
+        
+        // Gabungkan susunan angka menjadi 16 digit NIK
         const nik = `${prov}${kota}${kec}${dayStr}${month}${year}${nomorUrut}`;
 
+        // Pasang nama kustom jika diinput, atau acak nama lokal jika kosong
         let finalNama = nama || `${FIRST_NAMES[crypto.randomInt(0, FIRST_NAMES.length)]} ${LAST_NAMES[crypto.randomInt(0, LAST_NAMES.length)]}`;
 
         return res.status(200).json({ 
@@ -77,7 +77,7 @@ app.get('/api/generate-nik', (req, res) => {
 });
 
 /**
- * [ENDPOINT 2] GET: Akses Admin untuk Menambah API Key Baru ke Memori
+ * [ENDPOINT 2] GET: Akses Admin untuk Menambah API Key Baru
  */
 app.get('/api/admin/add-key', (req, res) => {
     try {
@@ -106,7 +106,7 @@ app.get('/api/admin/add-key', (req, res) => {
             });
         }
 
-        // 3. Masukkan kunci baru ke memori RAM server
+        // 3. Masukkan kunci baru ke memori RAM server agar langsung aktif
         VALID_API_KEYS.push(newkey);
 
         return res.status(200).json({
@@ -122,12 +122,3 @@ app.get('/api/admin/add-key', (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
-
-
-
-
-
-
-
-
